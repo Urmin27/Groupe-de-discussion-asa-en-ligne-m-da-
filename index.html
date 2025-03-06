@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat Public - EVO Finance</title>
+  <!-- Ampidirina ny Font Awesome ho an'ny icônes -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    /* Style fototra an'ny pejy */
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+      margin: 0;
+      padding: 0;
+    }
+    header {
+      background: #007BFF;
+      color: #fff;
+      text-align: center;
+      padding: 1rem;
+    }
+    /* Container an'ny chat */
+    #chat-container {
+      max-width: 600px;
+      margin: 20px auto;
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      display: flex;
+      flex-direction: column;
+      height: 600px;
+      overflow: hidden;
+    }
+    /* Lisitry ny hafatra */
+    #messages {
+      flex: 1;
+      padding: 1rem;
+      overflow-y: auto;
+      list-style: none;
+      margin: 0;
+    }
+    .message-bubble {
+      background: #e9ecef;
+      padding: 0.8rem;
+      border-radius: 15px;
+      margin-bottom: 0.8rem;
+      max-width: 80%;
+      position: relative;
+    }
+    .message-bubble.own {
+      background: #d1e7dd;
+      margin-left: auto;
+    }
+    .message-header {
+      font-weight: bold;
+      margin-bottom: 0.3rem;
+    }
+    /* Info momba ny reply */
+    .reply-info {
+      background: #f1f1f1;
+      padding: 5px 10px;
+      margin: 5px 0;
+      border-left: 3px solid #007BFF;
+      font-style: italic;
+      color: #555;
+    }
+    .reply-link {
+      color: #007BFF;
+      cursor: pointer;
+      font-size: 0.8rem;
+      margin-top: 5px;
+      display: inline-block;
+    }
+    /* Formulaire an'ny hafatra */
+    #message-form {
+      display: flex;
+      flex-direction: column;
+      border-top: 1px solid #ddd;
+    }
+    #email-input {
+      padding: 0.8rem;
+      border: none;
+      font-size: 1rem;
+      border-bottom: 1px solid #ddd;
+    }
+    .input-group {
+      display: flex;
+      align-items: center;
+      padding: 0.8rem;
+      position: relative;
+    }
+    #message-input {
+      flex: 1;
+      padding: 0.8rem;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 1rem;
+    }
+    .icon-btn {
+      background: transparent;
+      border: none;
+      font-size: 1.2rem;
+      margin-left: 10px;
+      cursor: pointer;
+    }
+    #send-btn {
+      padding: 0.8rem;
+      border: none;
+      background: #28a745;
+      color: #fff;
+      font-size: 1rem;
+      cursor: pointer;
+      border-radius: 4px;
+      margin: 0.8rem;
+    }
+    #send-btn:hover {
+      background: #218838;
+    }
+    /* Sehatra miseho raha misy reply */
+    #reply-section {
+      display: none;
+      background: #f9f9f9;
+      padding: 0.5rem;
+      border-bottom: 1px solid #ddd;
+    }
+    #reply-section span {
+      font-style: italic;
+      color: #555;
+    }
+    #cancel-reply {
+      background: transparent;
+      border: none;
+      color: red;
+      cursor: pointer;
+      margin-left: 10px;
+    }
+    /* Emoji picker */
+    .emoji-picker {
+      display: none;
+      position: absolute;
+      bottom: 45px;
+      right: 0;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+      padding: 5px;
+      z-index: 100;
+    }
+    .emoji-picker .emoji-option {
+      cursor: pointer;
+      font-size: 1.2rem;
+      padding: 5px;
+      display: inline-block;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>GROUPE DE DISCUSSION SITE WEB ASA EN LIGNE MÄDA </h1>
+  </header>
+  <div id="chat-container">
+    <ul id="messages"></ul>
+    <!-- Sehatra miseho raha misy reply -->
+    <div id="reply-section">
+      Répondre à: <span id="reply-message"></span>
+      <button id="cancel-reply">Annuler</button>
+    </div>
+    <form id="message-form">
+      <input id="email-input" type="email" placeholder="Votre email" required>
+      <div class="input-group">
+        <input id="message-input" type="text" placeholder="Tapez votre message ici..." required autocomplete="off">
+        <!-- Emoji container miaraka amin'ny emoji button sy emoji picker -->
+        <div class="emoji-container" style="position: relative;">
+          <button type="button" id="emoji-btn" class="icon-btn"><i class="fas fa-smile"></i></button>
+          <div id="emoji-picker" class="emoji-picker">
+            <span class="emoji-option">😊</span>
+            <span class="emoji-option">😍</span>
+            <span class="emoji-option">😢</span>
+            <span class="emoji-option">😂</span>
+            <span class="emoji-option">😡</span>
+          </div>
+        </div>
+      </div>
+      <button type="submit" id="send-btn">Envoyer</button>
+    </form>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, query, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/11.4.0/firebase-firestore.js";
+
+    // Configuration Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyDbAk8VyG7gfzmmFAFLAnUtUi1XrSNrQQQ",
+      authDomain: "evo-finance-service.firebaseapp.com",
+      projectId: "evo-finance-service",
+      storageBucket: "evo-finance-service.firebasestorage.app",
+      messagingSenderId: "231632509264",
+      appId: "1:231632509264:web:03cf6b9e2ef75a4f7bb455",
+      measurementId: "G-2561NK5LL8"
+    };
+
+    // Initialisation Firebase
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    // Mampiasa collection "publicChats" ho an'ny chat public
+    const chatsRef = collection(db, "publicChats");
+    const q = query(chatsRef, orderBy("timestamp", "asc"));
+
+    // Maka ireo éléments
+    const messagesList = document.getElementById("messages");
+    const messageForm = document.getElementById("message-form");
+    const emailInput = document.getElementById("email-input");
+    const messageInput = document.getElementById("message-input");
+    const emojiBtn = document.getElementById("emoji-btn");
+    const emojiPicker = document.getElementById("emoji-picker");
+    const replySection = document.getElementById("reply-section");
+    const replyMessageSpan = document.getElementById("reply-message");
+    const cancelReplyBtn = document.getElementById("cancel-reply");
+
+    // Variables ho an'ny reply
+    let replyTo = null;       // ID ny hafatra atao reply
+    let replyText = "";       // Hafatra asongadina amin'ny reply
+    let replySender = "";     // Anaran'ny mpandefa ilay hafatra atao reply
+
+    // Manao listen ho an'ny Firestore mba haseho avy hatrany ny hafatra
+    onSnapshot(q, (snapshot) => {
+      messagesList.innerHTML = "";
+      snapshot.forEach(doc => {
+        const msg = { id: doc.id, ...doc.data() };
+        displayMessage(msg);
+      });
+      messagesList.scrollTop = messagesList.scrollHeight;
+    });
+
+    function displayMessage(msg) {
+      const li = document.createElement("li");
+      li.className = "message-bubble";
+      // Raha misy reply, aseho ny info momba azy
+      li.innerHTML = `<div class="message-header">${msg.sender} (${msg.email}):</div>
+                      ${ msg.replyTo ? `<div class="reply-info">Réponse à ${msg.replySender}: ${msg.replyText}</div>` : "" }
+                      <div class="message-text">${msg.text || ""}</div>`;
+      // Mamorona bokotra "Répondre"
+      const replyLink = document.createElement("div");
+      replyLink.className = "reply-link";
+      replyLink.innerText = "Répondre";
+      replyLink.addEventListener("click", () => {
+        replyTo = msg.id;
+        replyText = msg.text;
+        replySender = msg.sender;
+        replySection.style.display = "block";
+        replyMessageSpan.innerText = `${replySender}: ${replyText}`;
+      });
+      li.appendChild(replyLink);
+      messagesList.appendChild(li);
+    }
+
+    // Emoji picker: rehefa tsindriana ny emoji button, aseho/afenina ny picker
+    emojiBtn.addEventListener("click", () => {
+      if (emojiPicker.style.display === "block") {
+        emojiPicker.style.display = "none";
+      } else {
+        emojiPicker.style.display = "block";
+      }
+    });
+
+    // Raha tsindriana ny emoji iray, ampidirina ao amin'ny input
+    document.querySelectorAll(".emoji-option").forEach(option => {
+      option.addEventListener("click", () => {
+        messageInput.value += option.textContent;
+        emojiPicker.style.display = "none";
+        messageInput.focus();
+      });
+    });
+
+    // Mandefa hafatra rehefa submit-ena ny formulaire
+    messageForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const email = emailInput.value.trim();
+      const text = messageInput.value.trim();
+      if(!email || !text) {
+        alert("Veuillez renseigner votre email et taper un message.");
+        return;
+      }
+      try {
+        await addDoc(chatsRef, {
+          sender: "Utilisateur",
+          email: email,
+          text: text,
+          timestamp: new Date(),
+          type: "text",
+          replyTo: replyTo || null,
+          replyText: replyTo ? replyText : "",
+          replySender: replyTo ? replySender : ""
+        });
+        messageInput.value = "";
+        cancelReply();
+      } catch(error) {
+        console.error("Erreur lors de l'envoi du message: ", error);
+      }
+    });
+
+    // Asa fanafoanana ny reply
+    function cancelReply() {
+      replyTo = null;
+      replyText = "";
+      replySender = "";
+      replySection.style.display = "none";
+      replyMessageSpan.innerText = "";
+    }
+    cancelReplyBtn.addEventListener("click", cancelReply);
+
+    // Afeno ny emoji picker rehefa manindry any ivelany
+    document.addEventListener("click", (e) => {
+      if (!e.target.closest(".emoji-container")) {
+        emojiPicker.style.display = "none";
+      }
+    });
+  </script>
+</body>
+</html>
